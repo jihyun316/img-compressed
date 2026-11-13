@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>이미지 일괄 경량화 도구 (WebP 기본)</title>
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <style>
     :root {
@@ -16,10 +16,10 @@
       --primary-soft: #eef2ff;
       
       /* 컨트롤 전용 색상 분리 (딥스카이 계열) */
-      --slider-track-fill: #0284c7;        /* 밝은 딥스카이 (트랙 & PNG 활성 버튼) */
-      --slider-thumb-border: #075985;      /* 짙은 오션스카이 (버튼 테두리 & 말풍선) */
+      --slider-track-fill: #0284c7;
+      --slider-thumb-border: #075985;
       --slider-thumb-border-hover: #082f49;
-      --control-soft-bg: #f0f9ff;          /* 연한 딥스카이 (PNG 호버 배경) */
+      --control-soft-bg: #f0f9ff;
       
       --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
       --card-bg: #ffffff;
@@ -55,7 +55,7 @@
       margin-bottom: 36px;
     }
     .header h2 {
-      font-size: 46px;
+      font-size: 34px;
       font-weight: 800;
       margin: 0 0 12px 0;
       letter-spacing: -0.5px;
@@ -148,6 +148,97 @@
     }
     #fileInput { display: none; }
 
+    /* --- 로딩 프로그레스 바 카드 --- */
+    .progress-card {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid #bae6fd;
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 6px 16px -4px rgba(2, 132, 199, 0.12);
+    }
+    .progress-card.active {
+      display: block;
+    }
+    .progress-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 14.5px;
+    }
+    .progress-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .progress-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2.5px solid #bae6fd;
+      border-top-color: var(--slider-track-fill);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+    .progress-card.done .progress-spinner {
+      animation: none;
+      border-color: var(--success);
+      background: var(--success);
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .progress-percent {
+      font-weight: 700;
+      color: var(--slider-thumb-border);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-card.done .progress-percent {
+      color: var(--success);
+    }
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--slider-track-fill), var(--primary));
+      transition: width 0.18s ease-out;
+      position: relative;
+    }
+    .progress-card.done .progress-fill {
+      background: var(--success);
+    }
+
+    /* 이미지 리스트 상단 전체 다운로드 버튼 */
+    .btn-download-all {
+      background: var(--primary);
+      color: white;
+      padding: 15px 24px;
+      font-size: 16.5px;
+      font-weight: 700;
+      border-radius: 14px;
+      display: none;
+      width: 100%;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+    .btn-download-all:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+    }
+
     /* 이미지 리스트 */
     .image-list {
       display: flex;
@@ -169,24 +260,56 @@
     .image-item:hover {
       box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
     }
+    .image-item.processing {
+      opacity: 0.72;
+      border-color: #bae6fd;
+    }
     .image-item.downloaded {
       background-color: #f0fdf4;
       border-color: #86efac;
     }
-    .preview {
-      width: 92px;
-      height: 92px;
-      object-fit: contain;
-      background: #f1f5f9;
-      border: 1px solid var(--border);
+
+    /* 클릭 가능한 썸네일 래퍼 */
+    .preview-wrapper {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      flex-shrink: 0;
       border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 1px solid var(--border);
+    }
+    .preview {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #f1f5f9;
       background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
                         linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
                         linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
                         linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
       background-size: 10px 10px;
       background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+      transition: transform 0.2s ease;
     }
+    .preview-badge {
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      background: rgba(15, 23, 42, 0.72);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+    .preview-wrapper:hover .preview {
+      transform: scale(1.04);
+    }
+
     .details { flex: 1; }
     .details h4 {
       margin: 0 0 8px 0;
@@ -195,21 +318,28 @@
       color: var(--text-main);
       word-break: break-all;
     }
+    .item-status-tag {
+      font-size: 13px;
+      color: var(--slider-track-fill);
+      font-weight: 600;
+      margin-left: 6px;
+    }
     .image-item.downloaded h4 { color: #166534; }
     .stats {
       font-size: 14.5px;
       color: var(--text-muted);
       display: flex;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .stats span strong { color: var(--text-main); font-weight: 700; }
     .savings { color: var(--success); font-weight: 700; }
     .savings.negative { color: var(--danger); }
 
-    .actions { display: flex; gap: 10px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     button {
-      padding: 11px 18px;
+      padding: 11px 16px;
       border: none;
       border-radius: 9px;
       cursor: pointer;
@@ -217,8 +347,20 @@
       font-size: 14px;
       transition: all 0.2s ease;
     }
+    .btn-preview {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border: 1px solid #cbd5e1;
+    }
+    .btn-preview:hover:not(:disabled) {
+      background: #e2e8f0;
+    }
+    .btn-preview:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .btn-download { background: var(--primary); color: white; }
-    .btn-download:hover { background: var(--primary-hover); }
+    .btn-download:hover:not(:disabled) { background: var(--primary-hover); }
     .btn-download:disabled { background: #cbd5e1; cursor: not-allowed; }
     .btn-download.downloaded-btn { background: #94a3b8; color: #ffffff; }
     .btn-delete { background: #fee2e2; color: var(--danger); }
@@ -291,6 +433,11 @@
       align-items: center;
     }
 
+    /* 5단계 스냅 슬라이더용 하단 라벨 여백 포함 래퍼 */
+    .slider-wrapper.discrete-wrapper {
+      padding: 38px 0 26px 0;
+    }
+
     .slider-tooltip {
       position: absolute;
       top: -4px;
@@ -320,6 +467,9 @@
     }
 
     input[type=range] {
+      position: relative;
+      z-index: 3;
+      appearance: none;
       -webkit-appearance: none;
       width: 100%;
       height: 8px;
@@ -327,6 +477,7 @@
       outline: none;
       cursor: pointer;
       background: #e2e8f0;
+      margin: 0;
     }
 
     input[type=range]::-webkit-slider-thumb {
@@ -365,60 +516,358 @@
       box-shadow: 0 0 0 5px rgba(7, 89, 133, 0.15), 0 3px 8px rgba(7, 89, 133, 0.3);
     }
 
-    /* --- PNG 전용 컨트롤 색상 (슬라이더 딥스카이 색상 통일) --- */
-    
-    /* 라벨 강조 텍스트 색상 통일 */
-    #pngControl label span {
-      color: var(--slider-track-fill);
+    /* PNG 5개 스냅 눈금 점 및 하단 단계 라벨 */
+    .slider-ticks {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 42px;
+      height: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .slider-tick-dot {
+      position: absolute;
+      top: -3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      background: #94a3b8;
+      transition: background-color 0.15s ease;
+    }
+    .slider-tick-dot.passed {
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .slider-tick-dot.active {
+      opacity: 0;
     }
 
-    .png-color-options {
+    .slider-step-labels {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 18px;
+      z-index: 5;
+    }
+    .slider-step-label {
+      position: absolute;
+      bottom: 0;
+      transform: translateX(-50%);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #64748b;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s ease;
+    }
+    .slider-step-label:hover {
+      color: var(--slider-track-fill);
+    }
+    .slider-step-label.active {
+      color: var(--slider-thumb-border);
+      font-weight: 700;
+    }
+
+    /* 전체 용량 실시간 요약 바 */
+    .total-summary {
+      display: none;
+      margin-top: 22px;
+      padding: 14px 18px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 15px;
+      color: var(--text-muted);
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .total-summary strong {
+      color: var(--text-main);
+    }
+    .total-summary-badge {
+      font-weight: 700;
+      color: var(--success);
+      background: #dcfce7;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 14px;
+    }
+    .total-summary-badge.negative {
+      color: var(--danger);
+      background: #fee2e2;
+    }
+
+    /* --- 원본 vs 압축본 확대 비교 모달 --- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .modal-backdrop.open {
       display: flex;
-      gap: 8px;
+    }
+    .modal-card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 860px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      max-height: 94vh;
+    }
+    .modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .modal-title-group h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+    .modal-title-group p {
+      margin: 4px 0 0 0;
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+    .modal-close {
+      background: #f1f5f9;
+      color: var(--text-muted);
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .modal-close:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    /* 배율 조절 툴바 */
+    .zoom-toolbar {
+      padding: 10px 24px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .zoom-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       flex-wrap: wrap;
     }
-    
-    .color-chip {
-      background: #f8fafc;
+    .zoom-btn {
+      padding: 6px 11px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 7px;
+      background: #ffffff;
       color: var(--text-muted);
       border: 1px solid #cbd5e1;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      transition: all 0.2s ease;
     }
-    
-    .color-chip:hover {
+    .zoom-btn:hover {
       border-color: var(--slider-track-fill);
       color: var(--slider-track-fill);
-      background: var(--control-soft-bg); /* 연한 딥스카이 배경 */
     }
-    
-    .color-chip.active {
+    .zoom-btn.active {
       background: var(--slider-track-fill);
       color: #ffffff;
       border-color: var(--slider-track-fill);
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25); /* 딥스카이 그림자 */
+    }
+    .zoom-indicator {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slider-thumb-border);
+      background: #e0f2fe;
+      padding: 5px 10px;
+      border-radius: 7px;
+      min-width: 56px;
+      text-align: center;
     }
 
-    /* 하단 전체 다운로드 버튼 */
-    .btn-download-all {
-      background: var(--primary);
-      color: white;
-      padding: 16px 24px;
-      font-size: 17px;
-      font-weight: 700;
-      border-radius: 12px;
-      display: none;
+    /* 고정 크기 + 드래그 패닝 & 분할 비교 뷰포트 */
+    .compare-viewport {
+      position: relative;
       width: 100%;
-      margin-top: 24px;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+      height: 400px;
+      min-height: 220px;
+      max-height: 62vh;
+      background-color: #f1f5f9;
+      background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                        linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+      cursor: grab;
     }
-    .btn-download-all:hover {
-      background: var(--primary-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+    .compare-viewport.panning {
+      cursor: grabbing;
+    }
+
+    .compare-layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .compare-layer.original-layer {
+      clip-path: inset(0 50% 0 0);
+    }
+    .compare-layer img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      max-width: none;
+      max-height: none;
+      transform-origin: 0 0;
+      display: block;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    /* 분할 비교 기준선 & 드래그 핸들 */
+    .compare-divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 28px;
+      transform: translateX(-50%);
+      cursor: ew-resize;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .compare-divider-line {
+      width: 2px;
+      height: 100%;
+      background: #ffffff;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+    }
+    .compare-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid var(--slider-thumb-border);
+      color: var(--slider-thumb-border);
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+    }
+
+    .compare-tag {
+      position: absolute;
+      top: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      background: rgba(15, 23, 42, 0.78);
+      color: #ffffff;
+      pointer-events: none;
+      line-height: 1.2;
+      z-index: 12;
+    }
+    .compare-tag.left { left: 12px; }
+    .compare-tag.right { right: 12px; background: rgba(7, 89, 133, 0.9); }
+
+    /* 드래그로 미리보기 영역 높이를 조절하는 하단 바 */
+    .viewport-resizer {
+      height: 14px;
+      background: #e2e8f0;
+      border-top: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      cursor: ns-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      touch-action: none;
+      transition: background-color 0.15s ease;
+    }
+    .viewport-resizer:hover,
+    .viewport-resizer.resizing {
+      background: #bae6fd;
+    }
+    .viewport-resizer::before {
+      content: '';
+      width: 38px;
+      height: 4px;
+      border-radius: 2px;
+      background: #64748b;
+    }
+
+    .modal-footer {
+      padding: 16px 24px 20px 24px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-stats-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 15px;
+    }
+    .modal-stats-values {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .modal-stats-values strong {
+      color: var(--text-main);
     }
 
     @media (max-width: 600px) {
@@ -453,13 +902,13 @@
             <span class="badge webp">WebP</span>
             <span class="badge jpeg">JPEG</span>
           </div>
-          <span><strong>압축 품질(Quality)</strong>을 조절하여 이미지 용량을 획기적으로 줄입니다. (WebP 권장)</span>
+          <span><strong>압축 품질(Quality)</strong>을 조절하면 용량과 썸네일이 실시간으로 갱신되며, 이미지를 클릭해 화질을 비교할 수 있습니다.</span>
         </li>
         <li>
           <div class="format-badges">
             <span class="badge png">PNG</span>
           </div>
-          <span><strong>최대 색상 수</strong>를 줄이는 최적화 알고리즘으로 투명도를 유지하면서 용량을 줄입니다.</span>
+          <span><strong>최대 색상 수(32색~무손실)</strong>를 조절하는 최적화 알고리즘으로 투명도를 유지하면서 용량을 줄입니다.</span>
         </li>
       </ul>
     </div>
@@ -471,6 +920,23 @@
       <span>지원 포맷: JPG, PNG, WebP 등</span>
       <input type="file" id="fileInput" accept="image/*" multiple>
     </div>
+
+    <!-- 압축 및 포맷 변환 진행 상태 프로그레스 바 -->
+    <div class="progress-card" id="progressCard" role="status" aria-live="polite">
+      <div class="progress-header">
+        <div class="progress-status">
+          <span class="progress-spinner" id="progressSpinner"></span>
+          <span id="progressText">이미지 처리 중...</span>
+        </div>
+        <span class="progress-percent" id="progressPercent">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- 전체 다운로드 버튼 (이미지 리스트 상단, 2개 이상일 때 표시) -->
+    <button class="btn-download-all" id="btnDownloadAll">전체 이미지 다운로드</button>
 
     <!-- 이미지 리스트 -->
     <div class="image-list" id="imageList"></div>
@@ -488,7 +954,7 @@
         </div>
         
         <!-- WebP / JPEG 용 품질 슬라이더 -->
-        <div class="control-group" id="qualityControl" style="flex: 1;">
+        <div class="control-group" id="qualityControl" style="flex: 1; min-width: 240px;">
           <label>압축 품질 (Quality)</label>
           <div class="slider-wrapper">
             <input type="range" id="qualitySlider" min="10" max="100" value="80">
@@ -496,57 +962,329 @@
           </div>
         </div>
 
-        <!-- PNG 전용 색상 수 선택 UI -->
-        <div class="control-group" id="pngControl" style="flex: 1; display: none;">
-          <label>최대 색상 수 (팔레트 최적화): <span id="pngColorLabel">256색 (균형)</span></label>
-          <div class="png-color-options" id="pngColorOptions">
-            <button type="button" class="color-chip active" data-colors="256" data-label="256색 (균형)">256색</button>
-            <button type="button" class="color-chip" data-colors="128" data-label="128색 (고압축)">128색</button>
-            <button type="button" class="color-chip" data-colors="64" data-label="64색 (초고압축)">64색</button>
-            <button type="button" class="color-chip" data-colors="32" data-label="32색 (최소 용량)">32색</button>
-            <button type="button" class="color-chip" data-colors="0" data-label="무손실 (원본 색상)">무손실</button>
+        <!-- PNG 전용 5단계 스냅 슬라이더 (저화질 32색 → 고화질 무손실) -->
+        <div class="control-group" id="pngControl" style="flex: 1; min-width: 240px; display: none;">
+          <label>최대 색상 수 (팔레트 최적화)</label>
+          <div class="slider-wrapper discrete-wrapper">
+            <input type="range" id="pngQualitySlider" min="0" max="4" step="1" value="3">
+            <div class="slider-tooltip" id="pngSliderTooltip">256색 (균형)</div>
+            <div class="slider-ticks" id="pngSliderTicks"></div>
+            <div class="slider-step-labels" id="pngSliderLabels"></div>
           </div>
         </div>
       </div>
 
-      <button class="btn-download-all" id="btnDownloadAll">전체 이미지 다운로드</button>
+      <!-- 전체 용량 실시간 요약 -->
+      <div class="total-summary" id="totalSummary">
+        <span id="totalSummaryText">총 원본: 0 KB → 압축 후: <strong>0 KB</strong></span>
+        <span class="total-summary-badge" id="totalSummaryBadge">0% 절감</span>
+      </div>
     </div>
 
+  </div>
+
+  <!-- 원본 vs 압축본 확대 비교 모달 -->
+  <div class="modal-backdrop" id="previewModal">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3 id="modalTitle">파일명.webp</h3>
+          <p id="modalResolution">0 × 0 px</p>
+        </div>
+        <button type="button" class="modal-close" id="modalCloseBtn" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="zoom-toolbar">
+        <span class="zoom-hint">이미지 드래그: 위치 이동 · 휠: 확대/축소 · ⇄: 화질 비교</span>
+        <div class="zoom-controls">
+          <button type="button" class="zoom-btn" data-zoom="fit">화면 맞춤</button>
+          <button type="button" class="zoom-btn active" data-zoom="1">100%</button>
+          <button type="button" class="zoom-btn" data-zoom="2">200%</button>
+          <button type="button" class="zoom-btn" data-zoom="3">300%</button>
+          <span class="zoom-indicator" id="zoomIndicator">100%</span>
+        </div>
+      </div>
+
+      <div class="compare-viewport" id="compareViewport">
+        <div class="compare-layer">
+          <img id="compareCompressedImg" src="" alt="압축 후 이미지">
+        </div>
+        <div class="compare-layer original-layer" id="originalLayer">
+          <img id="compareOriginalImg" src="" alt="원본 이미지">
+        </div>
+        <div class="compare-tag left" id="tagOriginal">원본</div>
+        <div class="compare-tag right" id="tagCompressed">압축 후</div>
+        <div class="compare-divider" id="compareDivider" title="좌우로 드래그하여 원본과 압축본 비교">
+          <div class="compare-divider-line"></div>
+          <div class="compare-handle">⇄</div>
+        </div>
+      </div>
+
+      <!-- 드래그하여 미리보기 영역 높이를 조절하는 핸들 -->
+      <div class="viewport-resizer" id="viewportResizer" title="위아래로 드래그하여 미리보기 창 크기 조절"></div>
+
+      <div class="modal-footer">
+        <div class="modal-stats-row">
+          <div class="modal-stats-values" id="modalStatsValues"></div>
+          <button type="button" class="btn-download" id="modalDownloadBtn">이 이미지 다운로드</button>
+        </div>
+
+        <!-- 모달 내부 실시간 화질 슬라이더 (WebP / JPEG 일 때 표시) -->
+        <div class="slider-wrapper" id="modalSliderWrapper" style="padding-top: 34px; margin-top: 0;">
+          <input type="range" id="modalQualitySlider" min="10" max="100" value="80">
+          <div class="slider-tooltip" id="modalSliderTooltip">80%</div>
+        </div>
+
+        <!-- 모달 내부 PNG 5단계 스냅 슬라이더 (PNG 일 때 표시) -->
+        <div class="slider-wrapper discrete-wrapper" id="modalPngSliderWrapper" style="padding-top: 34px; margin-top: 0; display: none;">
+          <input type="range" id="modalPngQualitySlider" min="0" max="4" step="1" value="3">
+          <div class="slider-tooltip" id="modalPngSliderTooltip">256색 (균형)</div>
+          <div class="slider-ticks" id="modalPngSliderTicks" style="top: 38px;"></div>
+          <div class="slider-step-labels" id="modalPngSliderLabels"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     const fileInput = document.getElementById('fileInput');
     const dropZone = document.getElementById('dropZone');
+    const progressCard = document.getElementById('progressCard');
+    const progressText = document.getElementById('progressText');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressFill = document.getElementById('progressFill');
     const imageList = document.getElementById('imageList');
     const formatSelect = document.getElementById('formatSelect');
     const qualityControl = document.getElementById('qualityControl');
     const qualitySlider = document.getElementById('qualitySlider');
     const sliderTooltip = document.getElementById('sliderTooltip');
+
+    // PNG 5단계 슬라이더 요소
     const pngControl = document.getElementById('pngControl');
-    const pngColorLabel = document.getElementById('pngColorLabel');
-    const pngColorButtons = document.querySelectorAll('.color-chip');
+    const pngQualitySlider = document.getElementById('pngQualitySlider');
+    const pngSliderTooltip = document.getElementById('pngSliderTooltip');
+    const pngSliderTicks = document.getElementById('pngSliderTicks');
+    const pngSliderLabels = document.getElementById('pngSliderLabels');
+
+    const totalSummary = document.getElementById('totalSummary');
+    const totalSummaryText = document.getElementById('totalSummaryText');
+    const totalSummaryBadge = document.getElementById('totalSummaryBadge');
     const btnDownloadAll = document.getElementById('btnDownloadAll');
 
-    let imagesData = [];
-    let selectedPngColors = 256;
+    // 모달 관련 요소
+    const previewModal = document.getElementById('previewModal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalResolution = document.getElementById('modalResolution');
+    const compareViewport = document.getElementById('compareViewport');
+    const originalLayer = document.getElementById('originalLayer');
+    const compareOriginalImg = document.getElementById('compareOriginalImg');
+    const compareCompressedImg = document.getElementById('compareCompressedImg');
+    const compareDivider = document.getElementById('compareDivider');
+    const viewportResizer = document.getElementById('viewportResizer');
+    const tagOriginal = document.getElementById('tagOriginal');
+    const tagCompressed = document.getElementById('tagCompressed');
+    const modalStatsValues = document.getElementById('modalStatsValues');
+    const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+    const modalSliderWrapper = document.getElementById('modalSliderWrapper');
+    const modalQualitySlider = document.getElementById('modalQualitySlider');
+    const modalSliderTooltip = document.getElementById('modalSliderTooltip');
 
-    function updateSliderUI() {
-      const val = qualitySlider.value;
-      const min = qualitySlider.min || 10;
-      const max = qualitySlider.max || 100;
-      const percent = (val - min) / (max - min);
-      const thumbWidth = 22;
-      const offset = (0.5 - percent) * thumbWidth;
-      
-      sliderTooltip.textContent = val + '%';
-      sliderTooltip.style.left = `calc(${percent * 100}% + ${offset}px)`;
-      qualitySlider.style.background = `linear-gradient(to right, var(--slider-track-fill) ${percent * 100}%, #e2e8f0 ${percent * 100}%)`;
+    const modalPngSliderWrapper = document.getElementById('modalPngSliderWrapper');
+    const modalPngQualitySlider = document.getElementById('modalPngQualitySlider');
+    const modalPngSliderTooltip = document.getElementById('modalPngSliderTooltip');
+    const modalPngSliderTicks = document.getElementById('modalPngSliderTicks');
+    const modalPngSliderLabels = document.getElementById('modalPngSliderLabels');
+
+    const zoomButtons = document.querySelectorAll('.zoom-btn');
+    const zoomIndicator = document.getElementById('zoomIndicator');
+
+    /* PNG 5단계 옵션 (왼쪽 저화질 → 오른쪽 고화질 순) */
+    const PNG_STEPS = [
+      { colors: 32,  shortLabel: '32색',   tooltip: '32색 (최소 용량)' },
+      { colors: 64,  shortLabel: '64색',   tooltip: '64색 (초고압축)' },
+      { colors: 128, shortLabel: '128색',  tooltip: '128색 (고압축)' },
+      { colors: 256, shortLabel: '256색',  tooltip: '256색 (균형)' },
+      { colors: 0,   shortLabel: '무손실', tooltip: '무손실 (원본 색상)' }
+    ];
+
+    let imagesData = [];
+    let selectedPngStepIndex = 3; // 기본값: 256색 (균형)
+    let activeModalId = null;
+    let splitPercent = 50;
+    let zoomLevel = 1;
+    let panX = 0;
+    let panY = 0;
+    let liveCompressTimer = null;
+    let progressHideTimer = null;
+    let compressionGeneration = 0;
+
+    function getSelectedPngColors() {
+      return PNG_STEPS[selectedPngStepIndex].colors;
     }
 
-    updateSliderUI();
+    /* 브라우저가 프로그레스 바 UI를 실제로 화면에 그릴 수 있도록 1프레임 양보 */
+    function yieldToMain() {
+      return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    }
 
-    qualitySlider.addEventListener('input', updateSliderUI);
-    qualitySlider.addEventListener('change', recompressAll);
+    function updateProgressBar(label, completed, total) {
+      clearTimeout(progressHideTimer);
+      progressCard.classList.remove('done');
+      progressCard.classList.add('active');
+
+      const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+      progressText.textContent = `${label} (${completed} / ${total})`;
+      progressPercent.textContent = `${pct}%`;
+      progressFill.style.width = `${pct}%`;
+    }
+
+    function completeProgressBar(total) {
+      clearTimeout(progressHideTimer);
+      progressCard.classList.add('active', 'done');
+      progressText.textContent = `변환 완료! (${total} / ${total})`;
+      progressPercent.textContent = '100%';
+      progressFill.style.width = '100%';
+
+      progressHideTimer = setTimeout(() => {
+        progressCard.classList.remove('active', 'done');
+        progressFill.style.width = '0%';
+      }, 750);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      const kb = bytes / 1024;
+      if (kb < 1024) return kb.toFixed(1) + ' KB';
+      return (kb / 1024).toFixed(2) + ' MB';
+    }
+
+    function getThumbAlignedLeft(percent) {
+      const thumbWidth = 22;
+      const offset = (0.5 - percent) * thumbWidth;
+      return `calc(${percent * 100}% + ${offset}px)`;
+    }
+
+    function syncSlidersUI(val) {
+      qualitySlider.value = val;
+      modalQualitySlider.value = val;
+
+      const min = 10;
+      const max = 100;
+      const percent = (val - min) / (max - min);
+      const leftPos = getThumbAlignedLeft(percent);
+      const bg = `linear-gradient(to right, var(--slider-track-fill) ${percent * 100}%, #e2e8f0 ${percent * 100}%)`;
+
+      sliderTooltip.textContent = val + '%';
+      sliderTooltip.style.left = leftPos;
+      qualitySlider.style.background = bg;
+
+      modalSliderTooltip.textContent = val + '%';
+      modalSliderTooltip.style.left = leftPos;
+      modalQualitySlider.style.background = bg;
+    }
+
+    /* PNG 5단계 스냅 슬라이더 눈금 및 라벨 생성 */
+    function initPngDiscreteSliderMarks(ticksContainer, labelsContainer) {
+      ticksContainer.innerHTML = '';
+      labelsContainer.innerHTML = '';
+
+      PNG_STEPS.forEach((step, idx) => {
+        const percent = idx / (PNG_STEPS.length - 1);
+        const leftPos = getThumbAlignedLeft(percent);
+
+        const dot = document.createElement('span');
+        dot.className = 'slider-tick-dot';
+        dot.style.left = leftPos;
+        dot.dataset.step = idx;
+        ticksContainer.appendChild(dot);
+
+        const label = document.createElement('span');
+        label.className = 'slider-step-label';
+        label.style.left = leftPos;
+        label.textContent = step.shortLabel;
+        label.dataset.step = idx;
+        label.addEventListener('click', () => handlePngStepChange(idx));
+        labelsContainer.appendChild(label);
+      });
+    }
+
+    function syncPngSlidersUI(stepIdx) {
+      const idx = Math.max(0, Math.min(PNG_STEPS.length - 1, parseInt(stepIdx, 10)));
+      pngQualitySlider.value = idx;
+      modalPngQualitySlider.value = idx;
+
+      const percent = idx / (PNG_STEPS.length - 1);
+      const leftPos = getThumbAlignedLeft(percent);
+      const bg = `linear-gradient(to right, var(--slider-track-fill) ${percent * 100}%, #e2e8f0 ${percent * 100}%)`;
+      const tooltipText = PNG_STEPS[idx].tooltip;
+
+      pngSliderTooltip.textContent = tooltipText;
+      pngSliderTooltip.style.left = leftPos;
+      pngQualitySlider.style.background = bg;
+
+      modalPngSliderTooltip.textContent = tooltipText;
+      modalPngSliderTooltip.style.left = leftPos;
+      modalPngQualitySlider.style.background = bg;
+
+      [pngSliderTicks, modalPngSliderTicks].forEach(container => {
+        container.querySelectorAll('.slider-tick-dot').forEach(dot => {
+          const s = parseInt(dot.dataset.step, 10);
+          dot.classList.toggle('passed', s < idx);
+          dot.classList.toggle('active', s === idx);
+        });
+      });
+
+      [pngSliderLabels, modalPngSliderLabels].forEach(container => {
+        container.querySelectorAll('.slider-step-label').forEach(lbl => {
+          const s = parseInt(lbl.dataset.step, 10);
+          lbl.classList.toggle('active', s === idx);
+        });
+      });
+    }
+
+    function handlePngStepChange(nextIdx) {
+      const idx = Math.max(0, Math.min(PNG_STEPS.length - 1, parseInt(nextIdx, 10)));
+      const changed = idx !== selectedPngStepIndex;
+      selectedPngStepIndex = idx;
+      syncPngSlidersUI(idx);
+
+      if (changed) {
+        clearTimeout(liveCompressTimer);
+        recompressAll(`PNG ${PNG_STEPS[idx].shortLabel} 최적화 적용 중...`);
+      }
+    }
+
+    initPngDiscreteSliderMarks(pngSliderTicks, pngSliderLabels);
+    initPngDiscreteSliderMarks(modalPngSliderTicks, modalPngSliderLabels);
+    syncSlidersUI(qualitySlider.value);
+    syncPngSlidersUI(selectedPngStepIndex);
+
+    function handleQualityInput(val) {
+      syncSlidersUI(val);
+      clearTimeout(liveCompressTimer);
+      liveCompressTimer = setTimeout(() => {
+        recompressAll('압축 품질 적용 중...');
+      }, 60);
+    }
+
+    qualitySlider.addEventListener('input', (e) => handleQualityInput(e.target.value));
+    qualitySlider.addEventListener('change', () => {
+      clearTimeout(liveCompressTimer);
+      recompressAll('압축 품질 적용 중...');
+    });
+
+    modalQualitySlider.addEventListener('input', (e) => handleQualityInput(e.target.value));
+    modalQualitySlider.addEventListener('change', () => {
+      clearTimeout(liveCompressTimer);
+      recompressAll('압축 품질 적용 중...');
+    });
+
+    pngQualitySlider.addEventListener('input', (e) => handlePngStepChange(e.target.value));
+    pngQualitySlider.addEventListener('change', (e) => handlePngStepChange(e.target.value));
+
+    modalPngQualitySlider.addEventListener('input', (e) => handlePngStepChange(e.target.value));
+    modalPngQualitySlider.addEventListener('change', (e) => handlePngStepChange(e.target.value));
 
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -556,21 +1294,15 @@
       dropZone.classList.remove('dragover');
       handleFiles(e.dataTransfer.files);
     });
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    fileInput.addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+      fileInput.value = '';
+    });
 
     formatSelect.addEventListener('change', () => {
       updateControlVisibility();
-      recompressAll();
-    });
-
-    pngColorButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        pngColorButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedPngColors = parseInt(btn.dataset.colors, 10);
-        pngColorLabel.textContent = btn.dataset.label;
-        recompressAll();
-      });
+      const formatName = formatSelect.value.split('/')[1].toUpperCase();
+      recompressAll(`${formatName} 포맷으로 변환 중...`);
     });
 
     btnDownloadAll.addEventListener('click', () => {
@@ -581,143 +1313,329 @@
       const isPng = formatSelect.value === 'image/png';
       qualityControl.style.display = isPng ? 'none' : 'flex';
       pngControl.style.display = isPng ? 'flex' : 'none';
-      if (!isPng) updateSliderUI();
+      modalSliderWrapper.style.display = isPng ? 'none' : 'flex';
+      modalPngSliderWrapper.style.display = isPng ? 'flex' : 'none';
+
+      requestAnimationFrame(() => {
+        if (isPng) {
+          syncPngSlidersUI(selectedPngStepIndex);
+        } else {
+          syncSlidersUI(qualitySlider.value);
+        }
+      });
     }
 
-    async function handleFiles(files) {
-      for (const file of files) {
-        if (!file.type.startsWith('image/')) continue;
-
-        const id = Date.now() + Math.random().toString(36).substr(2, 9);
-        createImageItemUI(id, file.name);
-
-        const data = { id, originalFile: file, filename: file.name, blob: null };
-        imagesData.push(data);
-        
-        await processImage(data);
-      }
-      updateDownloadAllButton();
-    }
-
-    async function recompressAll() {
-      for (const data of imagesData) {
-        await processImage(data);
-      }
-    }
-
-    async function processImage(data) {
-      const format = formatSelect.value;
-      const quality = parseInt(qualitySlider.value, 10) / 100;
-      
-      const compressedBlob = await compressImage(data.originalFile, format, quality, selectedPngColors);
-      data.blob = compressedBlob;
-      
-      const ext = format.split('/')[1] === 'jpeg' ? 'jpg' : format.split('/')[1];
-      data.filename = data.originalFile.name.replace(/\.[^/.]+$/, "") + "." + ext;
-
-      updateImageItemUI(data.id, data.originalFile, compressedBlob, data.filename);
-    }
-
-    function compressImage(file, format, quality, pngColors) {
-      return new Promise((resolve) => {
+    function loadOriginalImage(file) {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
+          const originalDataUrl = e.target.result;
           const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-
-            if (format === 'image/jpeg') {
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            ctx.drawImage(img, 0, 0);
-
-            if (format === 'image/png') {
-              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
-              try {
-                const compressedBuffer = UPNG.encode([imgData], canvas.width, canvas.height, pngColors);
-                const blob = new Blob([compressedBuffer], { type: 'image/png' });
-                resolve(blob);
-              } catch(err) {
-                canvas.toBlob((blob) => resolve(blob), format);
-              }
-            } else {
-              canvas.toBlob((blob) => resolve(blob), format, quality);
-            }
-          };
-          img.src = e.target.result;
+          img.onload = () => resolve({ img, originalDataUrl });
+          img.onerror = (err) => reject(err);
+          img.src = originalDataUrl;
         };
+        reader.onerror = (err) => reject(err);
         reader.readAsDataURL(file);
       });
     }
 
-    function createImageItemUI(id, filename) {
-      const div = document.createElement('div');
-      div.className = 'image-item';
-      div.id = `item-${id}`;
-      div.innerHTML = `
-        <img class="preview" id="preview-${id}" src="" alt="preview">
-        <div class="details">
-          <h4>${filename} <span style="font-size:13px; color:#94a3b8; font-weight:500;">(처리중...)</span></h4>
-          <div class="stats" id="stats-${id}"></div>
-        </div>
-        <div class="actions">
-          <button class="btn-download" id="dl-${id}" disabled>다운로드</button>
-          <button class="btn-delete" onclick="removeImage('${id}')">삭제</button>
-        </div>
-      `;
-      imageList.appendChild(div);
-    }
-
-    function updateImageItemUI(id, originalFile, compressedBlob, newFilename) {
+    function setItemProcessingState(id, isProcessing) {
       const item = document.getElementById(`item-${id}`);
       if (!item) return;
 
-      const preview = document.getElementById(`preview-${id}`);
-      const stats = document.getElementById(`stats-${id}`);
       const dlBtn = document.getElementById(`dl-${id}`);
       const title = item.querySelector('h4');
 
-      item.classList.remove('downloaded');
+      if (isProcessing) {
+        item.classList.add('processing');
+        if (dlBtn) dlBtn.disabled = true;
+        if (title && !title.querySelector('.item-status-tag')) {
+          const tag = document.createElement('span');
+          tag.className = 'item-status-tag';
+          tag.textContent = '(변환 중...)';
+          title.appendChild(tag);
+        }
+      } else {
+        item.classList.remove('processing');
+        const tag = title ? title.querySelector('.item-status-tag') : null;
+        if (tag) tag.remove();
+      }
+    }
+
+    async function handleFiles(files) {
+      const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+      if (imageFiles.length === 0) return;
+
+      const total = imageFiles.length;
+      let completed = 0;
+      const gen = ++compressionGeneration;
+
+      updateProgressBar('이미지 압축 중...', 0, total);
+      await yieldToMain();
+
+      for (const file of imageFiles) {
+        const id = Date.now() + Math.random().toString(36).substr(2, 9);
+        createImageItemUI(id, file.name);
+        await yieldToMain();
+
+        try {
+          const { img, originalDataUrl } = await loadOriginalImage(file);
+          const data = {
+            id,
+            originalFile: file,
+            img,
+            originalDataUrl,
+            previewUrl: null,
+            filename: file.name,
+            blob: null
+          };
+          imagesData.push(data);
+          await processImage(data, gen);
+        } catch (err) {
+          removeImage(id);
+        }
+
+        completed++;
+        if (gen === compressionGeneration) {
+          updateProgressBar('이미지 압축 중...', completed, total);
+          await yieldToMain();
+        }
+      }
+
+      if (gen === compressionGeneration) {
+        completeProgressBar(total);
+        updateSummaryAndButtons();
+      }
+    }
+
+    async function recompressAll(statusLabel = '이미지 재압축 중...') {
+      if (imagesData.length === 0) return;
+
+      const gen = ++compressionGeneration;
+      const snapshot = [...imagesData];
+      const total = snapshot.length;
+      let completed = 0;
+
+      snapshot.forEach(data => setItemProcessingState(data.id, true));
+      updateProgressBar(statusLabel, 0, total);
+      await yieldToMain();
+
+      for (const data of snapshot) {
+        if (gen !== compressionGeneration) return;
+        await processImage(data, gen);
+        if (gen !== compressionGeneration) return;
+
+        completed++;
+        updateProgressBar(statusLabel, completed, total);
+        await yieldToMain();
+      }
+
+      if (gen === compressionGeneration) {
+        completeProgressBar(total);
+        updateSummaryAndButtons();
+      }
+    }
+
+    async function processImage(data, gen) {
+      const format = formatSelect.value;
+      const quality = parseInt(qualitySlider.value, 10) / 100;
+      const pngColors = getSelectedPngColors();
+      
+      const compressedBlob = await compressLoadedImage(data.img, format, quality, pngColors);
+      if (gen !== compressionGeneration) return;
+
+      if (data.previewUrl) {
+        URL.revokeObjectURL(data.previewUrl);
+      }
+      data.blob = compressedBlob;
+      data.previewUrl = URL.createObjectURL(compressedBlob);
+      
+      const ext = format.split('/')[1] === 'jpeg' ? 'jpg' : format.split('/')[1];
+      data.filename = data.originalFile.name.replace(/\.[^/.]+$/, "") + "." + ext;
+
+      setItemProcessingState(data.id, false);
+      updateImageItemUI(data);
+      updateSummaryAndButtons();
+
+      if (activeModalId === data.id) {
+        renderPreviewModal(data);
+      }
+    }
+
+    function compressLoadedImage(img, format, quality, pngColors) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+
+        if (format === 'image/jpeg') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(img, 0, 0);
+
+        if (format === 'image/png') {
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
+          try {
+            const compressedBuffer = UPNG.encode([imgData], canvas.width, canvas.height, pngColors);
+            const blob = new Blob([compressedBuffer], { type: 'image/png' });
+            resolve(blob);
+          } catch (err) {
+            canvas.toBlob((blob) => resolve(blob), format);
+          }
+        } else {
+          canvas.toBlob((blob) => resolve(blob), format, quality);
+        }
+      });
+    }
+
+    /* 안전한 DOM API(textContent, addEventListener)를 사용하여 파일명 XSS 차단 */
+    function createImageItemUI(id, filename) {
+      const div = document.createElement('div');
+      div.className = 'image-item processing';
+      div.id = `item-${id}`;
+
+      const previewWrapper = document.createElement('div');
+      previewWrapper.className = 'preview-wrapper';
+      previewWrapper.title = '클릭하여 원본과 화질 비교하기';
+      previewWrapper.addEventListener('click', () => openPreviewModal(id));
+
+      const previewImg = document.createElement('img');
+      previewImg.className = 'preview';
+      previewImg.id = `preview-${id}`;
+      previewImg.src = '';
+      previewImg.alt = 'preview';
+
+      const previewBadge = document.createElement('span');
+      previewBadge.className = 'preview-badge';
+      previewBadge.textContent = '비교';
+
+      previewWrapper.append(previewImg, previewBadge);
+
+      const details = document.createElement('div');
+      details.className = 'details';
+
+      const title = document.createElement('h4');
+      title.textContent = filename + ' ';
+
+      const statusTag = document.createElement('span');
+      statusTag.className = 'item-status-tag';
+      statusTag.textContent = '(처리중...)';
+      title.appendChild(statusTag);
+
+      const stats = document.createElement('div');
+      stats.className = 'stats';
+      stats.id = `stats-${id}`;
+
+      details.append(title, stats);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const pvBtn = document.createElement('button');
+      pvBtn.type = 'button';
+      pvBtn.className = 'btn-preview';
+      pvBtn.id = `pv-${id}`;
+      pvBtn.textContent = '미리보기';
+      pvBtn.disabled = true;
+      pvBtn.addEventListener('click', () => openPreviewModal(id));
+
+      const dlBtn = document.createElement('button');
+      dlBtn.type = 'button';
+      dlBtn.className = 'btn-download';
+      dlBtn.id = `dl-${id}`;
+      dlBtn.textContent = '다운로드';
+      dlBtn.disabled = true;
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-delete';
+      delBtn.textContent = '삭제';
+      delBtn.addEventListener('click', () => removeImage(id));
+
+      actions.append(pvBtn, dlBtn, delBtn);
+      div.append(previewWrapper, details, actions);
+      imageList.appendChild(div);
+    }
+
+    function updateImageItemUI(data) {
+      const { id, originalFile, blob, filename, previewUrl } = data;
+      const item = document.getElementById(`item-${id}`);
+      if (!item || !blob) return;
+
+      const preview = document.getElementById(`preview-${id}`);
+      const stats = document.getElementById(`stats-${id}`);
+      const pvBtn = document.getElementById(`pv-${id}`);
+      const dlBtn = document.getElementById(`dl-${id}`);
+      const title = item.querySelector('h4');
+
+      item.classList.remove('downloaded', 'processing');
       dlBtn.classList.remove('downloaded-btn');
       dlBtn.textContent = '다운로드';
 
-      title.textContent = newFilename;
-      preview.src = URL.createObjectURL(compressedBlob);
+      title.textContent = filename;
+      preview.src = previewUrl;
 
-      const origSize = (originalFile.size / 1024).toFixed(1);
-      const newSize = (compressedBlob.size / 1024).toFixed(1);
-      const ratio = ((1 - (compressedBlob.size / originalFile.size)) * 100).toFixed(1);
+      const origSize = formatBytes(originalFile.size);
+      const newSize = formatBytes(blob.size);
+      const ratio = ((1 - (blob.size / originalFile.size)) * 100).toFixed(1);
       
-      const isNegative = compressedBlob.size > originalFile.size;
+      const isNegative = blob.size > originalFile.size;
       const savingsClass = isNegative ? 'negative' : 'savings';
       const savingsText = isNegative ? `용량 증가 (+${Math.abs(ratio)}%)` : `절감됨 (${ratio}%)`;
 
       stats.innerHTML = `
-        <span>원본: ${origSize} KB</span>
-        <span>압축후: <strong>${newSize} KB</strong></span>
+        <span>원본: ${origSize}</span>
+        <span>→ 압축 후: <strong>${newSize}</strong></span>
         <span class="${savingsClass}">${savingsText}</span>
       `;
 
+      pvBtn.disabled = false;
       dlBtn.disabled = false;
-      dlBtn.onclick = () => downloadImage(compressedBlob, newFilename, id);
+      dlBtn.onclick = () => downloadImage(blob, filename, id);
+    }
+
+    function updateSummaryAndButtons() {
+      const readyItems = imagesData.filter(d => d.blob);
+      if (readyItems.length === 0) {
+        totalSummary.style.display = 'none';
+        btnDownloadAll.style.display = 'none';
+        return;
+      }
+
+      const totalOrig = readyItems.reduce((sum, d) => sum + d.originalFile.size, 0);
+      const totalNew = readyItems.reduce((sum, d) => sum + d.blob.size, 0);
+      const ratio = ((1 - (totalNew / totalOrig)) * 100).toFixed(1);
+      const isNegative = totalNew > totalOrig;
+
+      totalSummary.style.display = 'flex';
+      totalSummaryText.innerHTML = `총 ${readyItems.length}개 원본: ${formatBytes(totalOrig)} → 압축 후 예상: <strong>${formatBytes(totalNew)}</strong>`;
+      
+      totalSummaryBadge.className = isNegative ? 'total-summary-badge negative' : 'total-summary-badge';
+      totalSummaryBadge.textContent = isNegative ? `+${Math.abs(ratio)}% 증가` : `${ratio}% 절감`;
+
+      btnDownloadAll.style.display = readyItems.length > 1 ? 'block' : 'none';
     }
 
     function removeImage(id) {
+      const target = imagesData.find(d => d.id === id);
+      if (target && target.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
       imagesData = imagesData.filter(d => d.id !== id);
       const item = document.getElementById(`item-${id}`);
       if (item) item.remove();
-      updateDownloadAllButton();
-    }
 
-    function updateDownloadAllButton() {
-      btnDownloadAll.style.display = imagesData.length > 1 ? 'block' : 'none';
+      if (activeModalId === id) {
+        closePreviewModal();
+      }
+      updateSummaryAndButtons();
     }
 
     function downloadImage(blob, filename, id) {
+      if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -727,16 +1645,231 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      if(id) {
+      if (id) {
         const item = document.getElementById(`item-${id}`);
         const dlBtn = document.getElementById(`dl-${id}`);
-        if(item && dlBtn) {
+        if (item && dlBtn) {
           item.classList.add('downloaded');
           dlBtn.classList.add('downloaded-btn');
           dlBtn.textContent = '다운로드 완료';
         }
       }
     }
+
+    /* --- 확대/패닝/리사이즈 비교 모달 로직 --- */
+    function applyImageTransform() {
+      const transformValue = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+      compareOriginalImg.style.transform = transformValue;
+      compareCompressedImg.style.transform = transformValue;
+      zoomIndicator.textContent = Math.round(zoomLevel * 100) + '%';
+    }
+
+    function updateZoomButtonsState(activeMode) {
+      zoomButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.zoom === activeMode);
+      });
+    }
+
+    function setZoomMode(mode) {
+      const data = imagesData.find(d => d.id === activeModalId);
+      if (!data) return;
+
+      const vw = compareViewport.clientWidth;
+      const vh = compareViewport.clientHeight;
+      const iw = data.img.naturalWidth || data.img.width;
+      const ih = data.img.naturalHeight || data.img.height;
+
+      if (mode === 'fit') {
+        zoomLevel = Math.min((vw - 32) / iw, (vh - 32) / ih, 1);
+      } else {
+        zoomLevel = parseFloat(mode);
+      }
+
+      panX = (vw - iw * zoomLevel) / 2;
+      panY = (vh - ih * zoomLevel) / 2;
+
+      applyImageTransform();
+      updateZoomButtonsState(String(mode));
+    }
+
+    zoomButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setZoomMode(btn.dataset.zoom);
+      });
+    });
+
+    function openPreviewModal(id) {
+      const data = imagesData.find(d => d.id === id);
+      if (!data || !data.blob) return;
+
+      activeModalId = id;
+      splitPercent = 50;
+      applySplitPosition(splitPercent);
+      renderPreviewModal(data);
+      previewModal.classList.add('open');
+
+      const isPng = formatSelect.value === 'image/png';
+      modalSliderWrapper.style.display = isPng ? 'none' : 'flex';
+      modalPngSliderWrapper.style.display = isPng ? 'flex' : 'none';
+
+      requestAnimationFrame(() => {
+        setZoomMode('1');
+        if (isPng) {
+          syncPngSlidersUI(selectedPngStepIndex);
+        } else {
+          syncSlidersUI(qualitySlider.value);
+        }
+      });
+    }
+
+    function closePreviewModal() {
+      activeModalId = null;
+      previewModal.classList.remove('open');
+    }
+
+    function renderPreviewModal(data) {
+      const w = data.img.naturalWidth || data.img.width;
+      const h = data.img.naturalHeight || data.img.height;
+      const origSize = formatBytes(data.originalFile.size);
+      const newSize = formatBytes(data.blob.size);
+      const ratio = ((1 - (data.blob.size / data.originalFile.size)) * 100).toFixed(1);
+      const isNegative = data.blob.size > data.originalFile.size;
+
+      modalTitle.textContent = data.filename;
+      modalResolution.textContent = `해상도 ${w} × ${h} px`;
+
+      compareOriginalImg.src = data.originalDataUrl;
+      compareCompressedImg.src = data.previewUrl;
+
+      tagOriginal.textContent = `원본 (${origSize})`;
+      tagCompressed.textContent = `압축 후 (${newSize})`;
+
+      modalStatsValues.innerHTML = `
+        <span>원본: ${origSize}</span>
+        <span>→</span>
+        <span>압축 후: <strong>${newSize}</strong></span>
+        <span class="${isNegative ? 'savings negative' : 'savings'}">${isNegative ? `+${Math.abs(ratio)}%` : `-${ratio}%`}</span>
+      `;
+
+      modalDownloadBtn.onclick = () => downloadImage(data.blob, data.filename, data.id);
+    }
+
+    function applySplitPosition(percent) {
+      const clamped = Math.max(0, Math.min(100, percent));
+      splitPercent = clamped;
+      originalLayer.style.clipPath = `inset(0 ${100 - clamped}% 0 0)`;
+      compareDivider.style.left = `${clamped}%`;
+    }
+
+    /* 분할 기준선 드래그 */
+    let isDraggingSplit = false;
+
+    compareDivider.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      isDraggingSplit = true;
+      compareDivider.setPointerCapture(e.pointerId);
+    });
+
+    compareDivider.addEventListener('pointermove', (e) => {
+      if (!isDraggingSplit) return;
+      const rect = compareViewport.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const percent = ((e.clientX - rect.left) / rect.width) * 100;
+      applySplitPosition(percent);
+    });
+
+    compareDivider.addEventListener('pointerup', (e) => {
+      isDraggingSplit = false;
+      if (compareDivider.hasPointerCapture(e.pointerId)) {
+        compareDivider.releasePointerCapture(e.pointerId);
+      }
+    });
+
+    /* 이미지 영역 드래그로 위치 이동 (패닝) */
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    compareViewport.addEventListener('pointerdown', (e) => {
+      if (isDraggingSplit) return;
+      isPanning = true;
+      panStartX = e.clientX - panX;
+      panStartY = e.clientY - panY;
+      compareViewport.classList.add('panning');
+      compareViewport.setPointerCapture(e.pointerId);
+    });
+
+    compareViewport.addEventListener('pointermove', (e) => {
+      if (!isPanning) return;
+      panX = e.clientX - panStartX;
+      panY = e.clientY - panStartY;
+      applyImageTransform();
+    });
+
+    compareViewport.addEventListener('pointerup', (e) => {
+      isPanning = false;
+      compareViewport.classList.remove('panning');
+      if (compareViewport.hasPointerCapture(e.pointerId)) {
+        compareViewport.releasePointerCapture(e.pointerId);
+      }
+    });
+
+    /* 마우스 휠로 커서 위치 기준 확대/축소 */
+    compareViewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = compareViewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const nextZoom = Math.max(0.1, Math.min(8, zoomLevel * factor));
+      const ratio = nextZoom / zoomLevel;
+
+      panX = mouseX - (mouseX - panX) * ratio;
+      panY = mouseY - (mouseY - panY) * ratio;
+      zoomLevel = nextZoom;
+
+      applyImageTransform();
+      updateZoomButtonsState('');
+    }, { passive: false });
+
+    /* 하단 리사이저 드래그로 미리보기 영역 높이 조절 */
+    let isResizingViewport = false;
+    let resizeStartY = 0;
+    let resizeStartHeight = 0;
+
+    viewportResizer.addEventListener('pointerdown', (e) => {
+      isResizingViewport = true;
+      resizeStartY = e.clientY;
+      resizeStartHeight = compareViewport.getBoundingClientRect().height;
+      viewportResizer.classList.add('resizing');
+      viewportResizer.setPointerCapture(e.pointerId);
+    });
+
+    viewportResizer.addEventListener('pointermove', (e) => {
+      if (!isResizingViewport) return;
+      const maxH = Math.floor(window.innerHeight * 0.65);
+      const nextH = Math.max(200, Math.min(maxH, resizeStartHeight + (e.clientY - resizeStartY)));
+      compareViewport.style.height = `${nextH}px`;
+    });
+
+    viewportResizer.addEventListener('pointerup', (e) => {
+      isResizingViewport = false;
+      viewportResizer.classList.remove('resizing');
+      if (viewportResizer.hasPointerCapture(e.pointerId)) {
+        viewportResizer.releasePointerCapture(e.pointerId);
+      }
+    });
+
+    modalCloseBtn.addEventListener('click', closePreviewModal);
+    previewModal.addEventListener('click', (e) => {
+      if (e.target === previewModal) closePreviewModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && previewModal.classList.contains('open')) {
+        closePreviewModal();
+      }
+    });
   </script>
 </body>
 </html>
