@@ -10,9 +10,17 @@
 
   <style>
     :root {
+      /* 기본 테마 색상 (인디고) */
       --primary: #6366f1;
       --primary-hover: #4f46e5;
       --primary-soft: #eef2ff;
+      
+      /* 컨트롤 전용 색상 분리 (딥스카이 계열) */
+      --slider-track-fill: #0284c7;        /* 밝은 딥스카이 (트랙 & PNG 활성 버튼) */
+      --slider-thumb-border: #075985;      /* 짙은 오션스카이 (버튼 테두리 & 말풍선) */
+      --slider-thumb-border-hover: #082f49;
+      --control-soft-bg: #f0f9ff;          /* 연한 딥스카이 (PNG 호버 배경) */
+      
       --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
       --card-bg: #ffffff;
       --text-main: #0f172a;
@@ -47,7 +55,7 @@
       margin-bottom: 36px;
     }
     .header h2 {
-      font-size: 34px;
+      font-size: 46px;
       font-weight: 800;
       margin: 0 0 12px 0;
       letter-spacing: -0.5px;
@@ -62,7 +70,7 @@
       font-weight: 500;
     }
 
-    /* 안내 박스 (타이틀 제거, 리스트 비교형) */
+    /* 안내 박스 */
     .info-box {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -216,7 +224,7 @@
     .btn-delete { background: #fee2e2; color: var(--danger); }
     .btn-delete:hover { background: #fecaca; color: #dc2626; }
 
-    /* 하단 컨트롤 패널 (일반 문서 흐름 배치, 타이틀 제거) */
+    /* 하단 컨트롤 패널 */
     .bottom-panel {
       background: var(--card-bg);
       padding: 26px 28px;
@@ -246,7 +254,7 @@
       font-size: 16px;
     }
     
-    /* 커스텀 셀렉트 박스 */
+    /* 셀렉트 박스 */
     select {
       appearance: none;
       -webkit-appearance: none;
@@ -273,20 +281,103 @@
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
     }
 
-    input[type=range] {
-      accent-color: var(--primary);
-      cursor: pointer;
-      height: 7px;
-      border-radius: 4px;
-      margin: 10px 0;
+    /* --- 슬라이더 & 말풍선 --- */
+    .slider-wrapper {
+      position: relative;
+      width: 100%;
+      padding: 38px 0 10px 0;
+      margin-top: -6px;
+      display: flex;
+      align-items: center;
     }
 
-    /* PNG 전용 색상 수 선택 버튼 그룹 */
+    .slider-tooltip {
+      position: absolute;
+      top: -4px;
+      transform: translateX(-50%);
+      background: var(--slider-thumb-border);
+      color: #ffffff;
+      padding: 4px 11px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 700;
+      pointer-events: none;
+      box-shadow: 0 3px 8px -2px rgba(7, 89, 133, 0.35);
+      white-space: nowrap;
+      z-index: 10;
+      will-change: left;
+    }
+
+    .slider-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px;
+      border-style: solid;
+      border-color: var(--slider-thumb-border) transparent transparent transparent;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      background: #e2e8f0;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3.5px solid var(--slider-thumb-border);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(7, 89, 133, 0.25);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    input[type=range]::-webkit-slider-thumb:hover,
+    input[type=range]::-webkit-slider-thumb:active {
+      border-color: var(--slider-thumb-border-hover);
+      box-shadow: 0 0 0 5px rgba(7, 89, 133, 0.15), 0 3px 8px rgba(7, 89, 133, 0.3);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      box-sizing: border-box;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3.5px solid var(--slider-thumb-border);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(7, 89, 133, 0.25);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type=range]::-moz-range-thumb:hover,
+    input[type=range]::-moz-range-thumb:active {
+      border-color: var(--slider-thumb-border-hover);
+      box-shadow: 0 0 0 5px rgba(7, 89, 133, 0.15), 0 3px 8px rgba(7, 89, 133, 0.3);
+    }
+
+    /* --- PNG 전용 컨트롤 색상 (슬라이더 딥스카이 색상 통일) --- */
+    
+    /* 라벨 강조 텍스트 색상 통일 */
+    #pngControl label span {
+      color: var(--slider-track-fill);
+    }
+
     .png-color-options {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
+    
     .color-chip {
       background: #f8fafc;
       color: var(--text-muted);
@@ -295,19 +386,23 @@
       border-radius: 10px;
       font-size: 14px;
       font-weight: 600;
+      transition: all 0.2s ease;
     }
+    
     .color-chip:hover {
-      border-color: var(--primary);
-      color: var(--primary);
-      background: var(--primary-soft);
+      border-color: var(--slider-track-fill);
+      color: var(--slider-track-fill);
+      background: var(--control-soft-bg); /* 연한 딥스카이 배경 */
     }
+    
     .color-chip.active {
-      background: var(--primary);
+      background: var(--slider-track-fill);
       color: #ffffff;
-      border-color: var(--primary);
-      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+      border-color: var(--slider-track-fill);
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25); /* 딥스카이 그림자 */
     }
 
+    /* 하단 전체 다운로드 버튼 */
     .btn-download-all {
       background: var(--primary);
       color: white;
@@ -336,12 +431,8 @@
         flex-direction: column;
         align-items: flex-start;
       }
-      .actions {
-        width: 100%;
-      }
-      .actions button {
-        flex: 1;
-      }
+      .actions { width: 100%; }
+      .actions button { flex: 1; }
     }
   </style>
 </head>
@@ -384,7 +475,7 @@
     <!-- 이미지 리스트 -->
     <div class="image-list" id="imageList"></div>
 
-    <!-- 하단 컨트롤 패널 (순서대로 배치) -->
+    <!-- 하단 컨트롤 패널 -->
     <div class="bottom-panel" id="bottomPanel">
       <div class="controls">
         <div class="control-group">
@@ -398,8 +489,11 @@
         
         <!-- WebP / JPEG 용 품질 슬라이더 -->
         <div class="control-group" id="qualityControl" style="flex: 1;">
-          <label for="qualitySlider">압축 품질 (Quality): <span id="qualityValue">80</span>%</label>
-          <input type="range" id="qualitySlider" min="10" max="100" value="80" style="width: 100%;">
+          <label>압축 품질 (Quality)</label>
+          <div class="slider-wrapper">
+            <input type="range" id="qualitySlider" min="10" max="100" value="80">
+            <div class="slider-tooltip" id="sliderTooltip">80%</div>
+          </div>
         </div>
 
         <!-- PNG 전용 색상 수 선택 UI -->
@@ -427,7 +521,7 @@
     const formatSelect = document.getElementById('formatSelect');
     const qualityControl = document.getElementById('qualityControl');
     const qualitySlider = document.getElementById('qualitySlider');
-    const qualityValue = document.getElementById('qualityValue');
+    const sliderTooltip = document.getElementById('sliderTooltip');
     const pngControl = document.getElementById('pngControl');
     const pngColorLabel = document.getElementById('pngColorLabel');
     const pngColorButtons = document.querySelectorAll('.color-chip');
@@ -436,7 +530,24 @@
     let imagesData = [];
     let selectedPngColors = 256;
 
-    // 이벤트 리스너
+    function updateSliderUI() {
+      const val = qualitySlider.value;
+      const min = qualitySlider.min || 10;
+      const max = qualitySlider.max || 100;
+      const percent = (val - min) / (max - min);
+      const thumbWidth = 22;
+      const offset = (0.5 - percent) * thumbWidth;
+      
+      sliderTooltip.textContent = val + '%';
+      sliderTooltip.style.left = `calc(${percent * 100}% + ${offset}px)`;
+      qualitySlider.style.background = `linear-gradient(to right, var(--slider-track-fill) ${percent * 100}%, #e2e8f0 ${percent * 100}%)`;
+    }
+
+    updateSliderUI();
+
+    qualitySlider.addEventListener('input', updateSliderUI);
+    qualitySlider.addEventListener('change', recompressAll);
+
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
@@ -451,9 +562,6 @@
       updateControlVisibility();
       recompressAll();
     });
-
-    qualitySlider.addEventListener('input', (e) => { qualityValue.textContent = e.target.value; });
-    qualitySlider.addEventListener('change', recompressAll);
 
     pngColorButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -473,6 +581,7 @@
       const isPng = formatSelect.value === 'image/png';
       qualityControl.style.display = isPng ? 'none' : 'flex';
       pngControl.style.display = isPng ? 'flex' : 'none';
+      if (!isPng) updateSliderUI();
     }
 
     async function handleFiles(files) {
